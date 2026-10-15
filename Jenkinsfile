@@ -82,20 +82,47 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
-            steps {
-                withCredentials([
-                    file(
-                        credentialsId: 'kubeconfig-file',
-                        variable: 'KUBECONFIG'
-                    )
-                ]) {
-                    bat 'kubectl set image deployment/%DEPLOYMENT_NAME% %CONTAINER_NAME%=%IMAGE_NAME%:%BUILD_NUMBER%'
+         
+stage('Deploy to Kubernetes') {
+    steps {
+        withCredentials([
+            file(
+                credentialsId: 'kubeconfig-file',
+                variable: 'KUBECONFIG'
+            )
+        ]) {
+            script {
+                def previousImage = bat(
+                    returnStdout: true,
+                    script: '''
+                    @echo off
+                    kubectl get deployment %DEPLOYMENT_NAME% -o "jsonpath={.spec.template.spec.containers[?(@.name==\\"%CONTAINER_NAME%\\")].image}"
+                    '''
+                ).trim()
+
+                echo "Previous stable image: ${previousImage}"
+
+                bat 'kubectl set image deployment/%DEPLOYMENT_NAME% %CONTAINER_NAME%=%IMAGE_NAME%:%BUILD_NUMBER%'
+
+                def rolloutResult = bat(
+                    returnStatus: true,
+                    script: 'kubectl rollout status deployment/%DEPLOYMENT_NAME% --timeout=120s'
+                )
+
+                if (rolloutResult != 0) {
+                    echo 'Deployment failed. Automatically rolling back to the previous revision.'
+
+                    bat 'kubectl rollout undo deployment/%DEPLOYMENT_NAME%'
                     bat 'kubectl rollout status deployment/%DEPLOYMENT_NAME% --timeout=120s'
+
+                    error('New deployment failed. Previous stable release has been restored.')
                 }
+
+                echo 'Deployment succeeded.'
             }
         }
-
+    }
+}
         stage('Verify Deployment') {
             steps {
                 withCredentials([
