@@ -1,0 +1,20 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: online-bookstore-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: online-bookstore
+  template:
+    metadata:
+      labels:
+        app: online-bookstore
+    spec:
+      containers:
+        - name: online-bookstore
+          image: deepasri111/online-bookstore:v1
+          ports:
+            - containerPort: 80

@@ -1,0 +1,179 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PageTurner | Online Bookstore</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f5f7fb;color:#202b3c}
+header{background:#172554;color:white;padding:24px 7%;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+header h1{margin:0;font-size:27px}
+header p{margin:7px 0 0;color:#cbd5e1}
+.cart-count{background:#fbbf24;color:#172554;padding:10px 15px;border-radius:20px;font-weight:bold}
+.hero{padding:35px 7%;background:#dbeafe}
+.hero h2{font-size:30px;margin:0 0 10px}
+main{padding:25px 7%}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:25px}
+input,select,button{font:inherit;padding:11px;border:1px solid #cbd5e1;border-radius:8px}
+input{flex:1;min-width:180px}
+button{cursor:pointer;background:#1d4ed8;color:white;border:0}
+button:hover{background:#1e40af}
+.book-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:18px}
+.book{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 3px 10px #0f172a0b}
+.cover{height:125px;background:#eff6ff;border-radius:10px;display:grid;place-items:center;font-size:55px}
+.book h3{margin-bottom:6px}
+.author,.category{color:#64748b;font-size:14px}
+.price{font-size:21px;font-weight:bold;margin:12px 0}
+.available{color:#15803d;font-size:13px;font-weight:bold}
+.unavailable{color:#b91c1c;font-size:13px;font-weight:bold}
+.book button{width:100%;margin-top:12px}
+section.panel{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-top:28px}
+section.panel h2{margin-top:0}
+.cart-row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #e2e8f0;padding:12px 0}
+.small-btn{padding:5px 10px;background:#475569}
+.status{display:inline-block;padding:5px 9px;background:#dcfce7;color:#166534;border-radius:15px;font-size:13px}
+footer{text-align:center;padding:25px;color:#64748b}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>📚 PageTurner Bookstore</h1>
+    <p>Discover your next favourite book.</p>
+  </div>
+  <div class="cart-count">🛒 Cart: <span id="cartCount">0</span></div>
+</header>
+
+<div class="hero">
+  <h2>Stories worth turning pages for.</h2>
+  <p>Explore fiction, technology, business and personal development.</p>
+</div>
+
+<main>
+  <h2>Explore Our Books</h2>
+  <div class="controls">
+    <input id="search" placeholder="Search by book title or author..." oninput="renderBooks()">
+    <select id="category" onchange="renderBooks()">
+      <option value="All">All Categories</option>
+      <option>Technology</option><option>Fiction</option>
+      <option>Business</option><option>Self-Help</option>
+    </select>
+  </div>
+
+  <div id="bookGrid" class="book-grid"></div>
+
+  <section class="panel" id="cart">
+    <h2>🛒 Your Shopping Cart</h2>
+    <div id="cartItems">Your cart is empty.</div>
+    <h3 id="total">Total: ₹0</h3>
+    <button onclick="placeOrder()">Place Order</button>
+    <p id="orderMessage"></p>
+  </section>
+
+  <section class="panel">
+    <h2>📦 Track Your Orders</h2>
+    <p>Orders placed in this browser will appear here.</p>
+    <div id="orders">No orders placed yet.</div>
+  </section>
+</main>
+
+<footer>© 2026 PageTurner Bookstore | Read. Learn. Grow.</footer>
+
+<script>
+const books = [
+ {id:1,title:"Clean Code",author:"Robert C. Martin",category:"Technology",price:650,available:true,icon:"💻"},
+ {id:2,title:"The Pragmatic Programmer",author:"Andrew Hunt",category:"Technology",price:720,available:true,icon:"🖥️"},
+ {id:3,title:"Atomic Habits",author:"James Clear",category:"Self-Help",price:450,available:true,icon:"🌱"},
+ {id:4,title:"The Alchemist",author:"Paulo Coelho",category:"Fiction",price:299,available:true,icon:"✨"},
+ {id:5,title:"Rich Dad Poor Dad",author:"Robert Kiyosaki",category:"Business",price:399,available:true,icon:"💰"},
+ {id:6,title:"Ikigai",author:"Héctor García",category:"Self-Help",price:350,available:false,icon:"🌸"},
+ {id:7,title:"The Lean Startup",author:"Eric Ries",category:"Business",price:520,available:true,icon:"🚀"},
+ {id:8,title:"Dune",author:"Frank Herbert",category:"Fiction",price:499,available:true,icon:"🏜️"}
+];
+
+let cart = [];
+let orders = JSON.parse(localStorage.getItem("pageTurnerOrders") || "[]");
+
+function renderBooks(){
+ const q=document.getElementById("search").value.toLowerCase();
+ const cat=document.getElementById("category").value;
+ const filtered=books.filter(b=>
+  (b.title.toLowerCase().includes(q)||b.author.toLowerCase().includes(q)) &&
+  (cat==="All"||b.category===cat)
+ );
+ document.getElementById("bookGrid").innerHTML=filtered.length?filtered.map(b=>`
+  <article class="book">
+   <div class="cover">${b.icon}</div>
+   <h3>${b.title}</h3>
+   <div class="author">By ${b.author}</div>
+   <p class="category">${b.category}</p>
+   <div class="price">₹${b.price}</div>
+   <div class="${b.available?'available':'unavailable'}">
+    ${b.available?'● In Stock':'● Out of Stock'}
+   </div>
+   <button ${b.available?'':'disabled style="background:#94a3b8"'}
+    onclick="addToCart(${b.id})">${b.available?'Add to Cart':'Unavailable'}</button>
+  </article>`).join(""):"<p>No matching books found.</p>";
+}
+
+function addToCart(id){
+ const book=books.find(b=>b.id===id);
+ if(!book||!book.available)return;
+ const item=cart.find(i=>i.id===id);
+ if(item)item.qty++;else cart.push({...book,qty:1});
+ renderCart();
+}
+
+function removeFromCart(id){
+ cart=cart.filter(i=>i.id!==id);
+ renderCart();
+}
+
+function renderCart(){
+ document.getElementById("cartCount").textContent=cart.reduce((s,i)=>s+i.qty,0);
+ document.getElementById("cartItems").innerHTML=cart.length?cart.map(i=>`
+  <div class="cart-row">
+   <span>${i.title} × ${i.qty}</span>
+   <span>₹${i.price*i.qty}
+   <button class="small-btn" onclick="removeFromCart(${i.id})">Remove</button></span>
+  </div>`).join(""):"Your cart is empty.";
+ document.getElementById("total").textContent="Total: ₹"+cart.reduce((s,i)=>s+i.price*i.qty,0);
+}
+
+function placeOrder(){
+ if(!cart.length){
+  document.getElementById("orderMessage").textContent="Please add an available book to your cart first.";
+  return;
+ }
+ const order={
+  id:"PT"+Date.now().toString().slice(-8),
+  items:cart.map(i=>({title:i.title,qty:i.qty})),
+  total:cart.reduce((s,i)=>s+i.price*i.qty,0),
+  status:"Order Placed"
+ };
+ orders.unshift(order);
+ localStorage.setItem("pageTurnerOrders",JSON.stringify(orders));
+ cart=[];
+ renderCart();
+ renderOrders();
+ document.getElementById("orderMessage").textContent="Thank you! Your order "+order.id+" has been placed.";
+}
+
+function renderOrders(){
+ document.getElementById("orders").innerHTML=orders.length?orders.map(o=>`
+  <div class="cart-row">
+   <div><strong>Order ${o.id}</strong><br>
+   ${o.items.map(i=>i.title+" × "+i.qty).join(", ")}<br>
+   Total: ₹${o.total}</div>
+   <span class="status">${o.status}</span>
+  </div>`).join(""):"No orders placed yet.";
+}
+
+renderBooks();
+renderCart();
+renderOrders();
+</script>
+</body>
+</html>
