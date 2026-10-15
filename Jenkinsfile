@@ -2,6 +2,13 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(
+            name: 'RELEASE_MODE',
+            choices: ['NORMAL', 'FAULTY_TEST'],
+            description: 'NORMAL deploys the build image; FAULTY_TEST tests automatic rollback.'
+        )
+    }
     options {
         skipDefaultCheckout(true)
         timestamps()
@@ -83,6 +90,7 @@ pipeline {
         }
 
          
+
 stage('Deploy to Kubernetes') {
     steps {
         withCredentials([
@@ -92,37 +100,39 @@ stage('Deploy to Kubernetes') {
             )
         ]) {
             script {
-                def previousImage = bat(
-                    returnStdout: true,
-                    script: '''
-                    @echo off
-                    kubectl get deployment %DEPLOYMENT_NAME% -o "jsonpath={.spec.template.spec.containers[?(@.name==\\"%CONTAINER_NAME%\\")].image}"
-                    '''
-                ).trim()
+                def targetImage
 
-                echo "Previous stable image: ${previousImage}"
+                if (params.RELEASE_MODE == 'FAULTY_TEST') {
+                    targetImage = "${env.IMAGE_NAME}:bad-version"
+                    echo 'FAULTY TEST: deploying an intentionally invalid image.'
+                } else {
+                    targetImage = "${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
+                    echo "Normal deployment: ${targetImage}"
+                }
 
-                bat 'kubectl set image deployment/%DEPLOYMENT_NAME% %CONTAINER_NAME%=%IMAGE_NAME%:%BUILD_NUMBER%'
+                bat "kubectl set image deployment/${env.DEPLOYMENT_NAME} ${env.CONTAINER_NAME}=${targetImage}"
 
                 def rolloutResult = bat(
                     returnStatus: true,
-                    script: 'kubectl rollout status deployment/%DEPLOYMENT_NAME% --timeout=120s'
+                    script: "kubectl rollout status deployment/${env.DEPLOYMENT_NAME} --timeout=60s"
                 )
 
                 if (rolloutResult != 0) {
-                    echo 'Deployment failed. Automatically rolling back to the previous revision.'
+                    echo 'Rollout failed. Starting automatic rollback.'
 
-                    bat 'kubectl rollout undo deployment/%DEPLOYMENT_NAME%'
-                    bat 'kubectl rollout status deployment/%DEPLOYMENT_NAME% --timeout=120s'
+                    bat "kubectl rollout undo deployment/${env.DEPLOYMENT_NAME}"
 
-                    error('New deployment failed. Previous stable release has been restored.')
+                    bat "kubectl rollout status deployment/${env.DEPLOYMENT_NAME} --timeout=120s"
+
+                    error('The new release failed. Automatic rollback was performed.')
                 }
 
-                echo 'Deployment succeeded.'
+                echo 'Deployment rollout succeeded.'
             }
         }
     }
 }
+
         stage('Verify Deployment') {
             steps {
                 withCredentials([
