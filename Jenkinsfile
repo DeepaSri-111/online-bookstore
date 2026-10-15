@@ -24,7 +24,7 @@ pipeline {
 
         stage('Automated Tests') {
             steps {
-                bat 'python test.py'
+                bat '"C:\\Users\\tdees\\AppData\\Local\\Programs\\Python\\Python312\\python.exe" test.py'
             }
         }
 
